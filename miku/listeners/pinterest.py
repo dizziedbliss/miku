@@ -7,7 +7,7 @@ from miku.extractor.pinterest import extract_pinterest_video
 logger = logging.getLogger(__name__)
 
 
-PIN_REGEX = re.compile(r"https?://(www\.)?pinterest\.com/pin/\S+|https?://pin\.it/\S+")
+PIN_REGEX = re.compile(r"https?://(?:www\.)?pinterest\.com/pin/[^\s<]+|https?://pin\.it/[^\s<]+")
 
 
 async def on_message(event: hikari.MessageCreateEvent) -> None:
@@ -16,18 +16,23 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         return
 
     logger.debug(f"Checking message content: {event.message.content}")
-    match = PIN_REGEX.search(event.message.content)
-    if not match:
+    pin_urls = PIN_REGEX.findall(event.message.content)
+    if not pin_urls:
         logger.debug("No Pinterest link found in message")
         return
-
-    pin_url = match.group(0)
-    logger.info(f"Found Pinterest link: {pin_url}")
     
-    video_url = await extract_pinterest_video(pin_url)
-    logger.info(f"Extracted video URL: {video_url}")
-    if not video_url:
-        logger.warning(f"Failed to extract video URL from {pin_url}")
+    logger.info(f"Found {len(pin_urls)} Pinterest link(s): {pin_urls}")
+    
+    # Extract media from all links
+    media_urls = []
+    for pin_url in pin_urls:
+        media_url = await extract_pinterest_video(pin_url)
+        logger.info(f"Extracted media URL from {pin_url}: {media_url}")
+        if media_url:
+            media_urls.append(media_url)
+    
+    if not media_urls:
+        logger.warning(f"Failed to extract any media URLs")
         return
 
     try:
@@ -47,12 +52,16 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         )
         logger.debug(f"Webhook created: {webhook.id}")
 
-        # Extract text without the Pinterest link
-        text_content = event.message.content.replace(pin_url, "").strip()
+        # Extract text without the Pinterest links
+        text_content = event.message.content
+        for pin_url in pin_urls:
+            text_content = text_content.replace(pin_url, "")
+        text_content = text_content.strip()
         logger.debug(f"Extracted text: {text_content}")
         
-        # Combine text with the media link
-        message_content = f"{text_content}\n[‎ ]({video_url})" if text_content else f"[.]({video_url})"
+        # Combine text with the media links
+        media_links = "\n".join([f"[.]({url})" for url in media_urls])
+        message_content = f"{text_content}\n{media_links}" if text_content else media_links
 
         await event.app.rest.execute_webhook(
             webhook=webhook,
@@ -62,7 +71,7 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
             avatar_url=event.message.author.make_avatar_url(),
             user_mentions=True,
         )
-        logger.info(f"Webhook executed successfully with video: {video_url}")
+        logger.info(f"Webhook executed successfully with {len(media_urls)} media URL(s)")
 
         await event.app.rest.delete_webhook(webhook)
         logger.debug("Webhook deleted successfully")
