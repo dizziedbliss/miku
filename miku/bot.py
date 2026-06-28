@@ -2,7 +2,7 @@ import hikari
 import lightbulb
 
 from miku.config import TOKEN
-from miku.listeners import beam, pinterest
+from miku.listeners import beam, pinterest, vc
 
 intents = hikari.Intents.GUILDS | hikari.Intents.GUILD_MESSAGES | hikari.Intents.MESSAGE_CONTENT
 bot = hikari.GatewayBot(token=TOKEN, intents=intents)
@@ -12,5 +12,6 @@ bot.subscribe(hikari.StartingEvent, client.start)
 
 beam.register(bot)
 pinterest.register(bot)
+vc.register(bot)
 
 bot.run()
