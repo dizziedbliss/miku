@@ -35,3 +35,6 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         await event.message.respond(
             f"Leaving your voice channel FOREVER (until u tell me to join by using `{PREFIX}join`)"
         )
+        
+def register(bot: hikari.GatewayBot) -> None:
+    bot.subscribe(hikari.MessageCreateEvent, on_message)
